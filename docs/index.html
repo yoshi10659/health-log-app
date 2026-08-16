@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>記録</title>
+  <meta name="theme-color" content="#2b6ef2">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="記録">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="header-date" id="header-date"></div>
+    <div class="header-actions">
+      <button class="icon-btn" id="btn-favorites" title="定番メニュー">★</button>
+      <button class="icon-btn" id="btn-settings" title="設定">⚙</button>
+    </div>
+  </header>
+
+  <!-- ホーム -->
+  <main id="view-home" class="view">
+    <section class="card weight-card">
+      <div class="card-label">体重</div>
+      <div class="big-number" id="home-weight">--</div>
+      <div class="sub-text" id="home-avg2w">2週間平均 --</div>
+    </section>
+
+    <div class="two-col">
+      <section class="card">
+        <div class="card-label">あと摂れるカロリー</div>
+        <div class="mid-number blue" id="home-kcal-left">--</div>
+        <div class="sub-text" id="home-kcal-detail">目標 -- / 摂取 --</div>
+        <div class="bar"><div class="bar-fill blue-bg" id="home-kcal-bar"></div></div>
+      </section>
+      <section class="card">
+        <div class="card-label">あと必要なたんぱく質</div>
+        <div class="mid-number green" id="home-protein-left">--</div>
+        <div class="sub-text" id="home-protein-detail">目標 -- / 摂取 --</div>
+        <div class="bar"><div class="bar-fill green-bg" id="home-protein-bar"></div></div>
+      </section>
+    </div>
+
+    <section class="card steps-card">
+      <span id="home-steps">昨日の歩数 --</span>
+    </section>
+
+    <div class="chips" id="meal-chips">
+      <span class="chip" data-slot="朝食">朝食</span>
+      <span class="chip" data-slot="昼食">昼食</span>
+      <span class="chip" data-slot="夕食">夕食</span>
+      <span class="chip" data-slot="間食">間食</span>
+    </div>
+
+    <div class="undo-banner hidden" id="undo-banner">
+      <span class="undo-text" id="undo-text"></span>
+      <button class="undo-btn" id="btn-undo">取り消す</button>
+    </div>
+
+    <div class="input-buttons">
+      <button class="input-btn" id="btn-photo">📷 写真</button>
+      <button class="input-btn" id="btn-voice">🎤 音声</button>
+      <button class="input-btn" id="btn-text">⌨ テキスト</button>
+    </div>
+    <input type="file" id="photo-input" accept="image/*" hidden>
+  </main>
+
+  <!-- 録音中 -->
+  <div id="voice-overlay" class="overlay hidden">
+    <div class="overlay-box">
+      <div class="rec-dot"></div>
+      <div class="rec-label">録音中…</div>
+      <div class="rec-hint">「体重57.2キロ」「朝食プロテイン」のように話してください</div>
+      <div class="row-buttons">
+        <button class="btn secondary" id="btn-voice-cancel">やめる</button>
+        <button class="btn primary" id="btn-voice-stop">録音を終了して送る</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- テキスト入力 -->
+  <div id="text-overlay" class="overlay hidden">
+    <div class="overlay-box">
+      <div class="overlay-title">テキストで記録</div>
+      <textarea id="text-input" rows="3" placeholder="例: 朝食プロテイン / 体重57.2kg / 8月15日 歩数8200歩"></textarea>
+      <div class="row-buttons">
+        <button class="btn secondary" id="btn-text-cancel">やめる</button>
+        <button class="btn primary" id="btn-text-send">送る</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 確認画面 -->
+  <main id="view-confirm" class="view hidden">
+    <h2 class="view-title">内容の確認</h2>
+    <p class="view-note" id="confirm-note"></p>
+    <div id="confirm-cards"></div>
+    <button class="btn secondary full" id="btn-confirm-back">ホームに戻る</button>
+  </main>
+
+  <!-- 定番メニュー管理 -->
+  <main id="view-favorites" class="view hidden">
+    <h2 class="view-title">定番メニュー</h2>
+    <p class="view-note">ここに登録した食事は、名前が一致すると確認なしで即記録されます。</p>
+    <div id="favorites-list"></div>
+    <section class="card">
+      <div class="card-label">新しく登録</div>
+      <input type="text" id="fav-name" placeholder="名前(例: プロテイン30g)">
+      <div class="two-col">
+        <input type="number" id="fav-kcal" placeholder="カロリー(kcal)">
+        <input type="number" id="fav-protein" placeholder="たんぱく質(g)">
+      </div>
+      <button class="btn primary full" id="btn-fav-add">追加する</button>
+    </section>
+    <button class="btn secondary full" id="btn-favorites-back">ホームに戻る</button>
+  </main>
+
+  <!-- 設定 -->
+  <main id="view-settings" class="view hidden">
+    <h2 class="view-title">設定</h2>
+    <section class="card">
+      <div class="card-label">1日の目標</div>
+      <label class="field-label">目標カロリー(kcal)</label>
+      <input type="number" id="setting-kcal">
+      <label class="field-label">目標たんぱく質(g)</label>
+      <input type="number" id="setting-protein">
+      <button class="btn primary full" id="btn-save-targets">目標を保存</button>
+    </section>
+    <section class="card">
+      <div class="card-label">接続設定(最初に1回だけ)</div>
+      <label class="field-label">GASウェブアプリのURL</label>
+      <input type="url" id="setting-url" placeholder="https://script.google.com/macros/s/…/exec">
+      <label class="field-label">合言葉(トークン)</label>
+      <input type="text" id="setting-token" placeholder="セットアップ時に表示された文字列">
+      <button class="btn primary full" id="btn-save-conn">接続設定を保存</button>
+    </section>
+    <button class="btn secondary full" id="btn-settings-back">ホームに戻る</button>
+  </main>
+
+  <!-- 処理中スピナー / トースト -->
+  <div id="spinner" class="overlay hidden">
+    <div class="overlay-box spinner-box">
+      <div class="spinner"></div>
+      <div id="spinner-text">処理中…</div>
+    </div>
+  </div>
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -177,12 +177,22 @@ async function analyzeAndHandle(inputType, data, mimeType) {
 // 写真: 縮小してから送る
 $('btn-photo').addEventListener('click', () => $('photo-input').click());
 $('photo-input').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
+  const files = Array.from(e.target.files);
   e.target.value = '';
-  if (!file) return;
-  const dataUrl = await resizeImage(file, 1280, 0.8);
-  const base64 = dataUrl.split(',')[1];
-  analyzeAndHandle('image', base64, 'image/jpeg');
+  if (!files.length) return;
+  try {
+    spinner(true, files.length > 1 ? `写真${files.length}枚を準備中…` : '写真を準備中…');
+    const base64s = [];
+    for (const file of files) {
+      const dataUrl = await resizeImage(file, 1280, 0.8);
+      base64s.push(dataUrl.split(',')[1]);
+    }
+    spinner(false);
+    analyzeAndHandle('image', base64s.length === 1 ? base64s[0] : base64s, 'image/jpeg');
+  } catch (err) {
+    spinner(false);
+    toast('写真の読み込みに失敗: ' + err.message, 4000);
+  }
 });
 
 function resizeImage(file, maxSize, quality) {

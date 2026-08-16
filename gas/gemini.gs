@@ -15,8 +15,11 @@ function analyze_(req) {
   if (req.inputType === 'text') {
     parts.push({ text: 'ユーザーの入力: ' + String(req.data || '') });
   } else if (req.inputType === 'image' || req.inputType === 'audio') {
-    if (!req.data) return { error: 'データがありません' };
-    parts.push({ inline_data: { mime_type: req.mimeType || 'image/jpeg', data: req.data } });
+    const items = Array.isArray(req.data) ? req.data : [req.data];
+    if (!items.length || !items[0]) return { error: 'データがありません' };
+    items.forEach(function (d) {
+      parts.push({ inline_data: { mime_type: req.mimeType || 'image/jpeg', data: d } });
+    });
   } else {
     return { error: '不明な入力種別です: ' + req.inputType };
   }
@@ -120,6 +123,7 @@ function buildPrompt_(favorites) {
     '',
     '# ルール',
     '- 入力に含まれる記録だけをrecordsに入れる。1つの入力に複数の記録(例: 体重と歩数)があれば複数入れる。',
+    '- 写真が複数枚ある場合は、1枚ずつすべて判定してrecordsに全部入れる(例: 惣菜3品の写真3枚 → 食事レコード3件)。',
     '- 日付の指定(「8月15日」「昨日」など)があればdateに入れる。指定がなければnull(今日扱い)。',
     '- 音声の文字起こしは日本語として解釈する。',
     '- 食事のslotは発言に「朝食」「昼食」「夕食」「間食」があればそれを使い、なければnull。',

@@ -524,7 +524,7 @@ function settingsSet_(req) {
 function analyze_(req) {
   const key = PROPS.getProperty('GEMINI_API_KEY');
   if (!key) return { error: 'GEMINI_API_KEY が未設定です(スクリプトプロパティ)' };
-  const model = PROPS.getProperty('GEMINI_MODEL') || 'gemini-2.5-flash';
+  const model = PROPS.getProperty('GEMINI_MODEL') || 'gemini-3.6-flash';
 
   const favorites = favList_();
   const parts = [{ text: buildPrompt_(favorites) }];
@@ -541,7 +541,6 @@ function analyze_(req) {
   const body = {
     contents: [{ role: 'user', parts: parts }],
     generationConfig: {
-      temperature: 0.2,
       response_mime_type: 'application/json'
     }
   };
@@ -669,4 +668,3 @@ function testSummary() {
 function testAnalyze() {
   Logger.log(JSON.stringify(analyze_({ inputType: 'text', data: '朝食プロテイン たんぱく質30g' }), null, 2));
 }
-

@@ -29,6 +29,9 @@ function doPost(e) {
       case 'analyze':          res = analyze_(req); break;
       case 'write':            res = writeRecord_(req.record, !!req.force); break;
       case 'undo':             res = undoLast_(); break;
+      case 'meals_list':       res = mealsList_(req); break;
+      case 'meal_update':      res = mealUpdate_(req); break;
+      case 'meal_delete':      res = mealDelete_(req); break;
       case 'favorites_list':   res = { favorites: favList_() }; break;
       case 'favorites_add':    res = favAdd_(req); break;
       case 'favorites_update': res = favUpdate_(req); break;

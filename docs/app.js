@@ -9,7 +9,7 @@ const CONF = {
 };
 
 const $ = (id) => document.getElementById(id);
-const VIEWS = ['view-home', 'view-confirm', 'view-favorites', 'view-settings'];
+const VIEWS = ['view-home', 'view-confirm', 'view-favorites', 'view-settings', 'view-meals'];
 
 function showView(id) {
   VIEWS.forEach(v => $(v).classList.toggle('hidden', v !== id));
@@ -420,6 +420,113 @@ $('btn-undo').addEventListener('click', async () => {
     toast('取り消しに失敗: ' + err.message, 4000);
   }
 });
+
+// ---------- 食事の一覧・修正 ----------
+$('btn-meals').addEventListener('click', () => {
+  $('meals-date').value = todayISO();
+  showView('view-meals');
+  loadMeals();
+});
+$('btn-meals-back').addEventListener('click', () => { showView('view-home'); loadHome(); });
+$('meals-date').addEventListener('change', loadMeals);
+
+async function loadMeals() {
+  try {
+    spinner(true, '読み込み中…');
+    const res = await api('meals_list', { date: $('meals-date').value });
+    spinner(false);
+    renderMeals(res.items);
+  } catch (err) {
+    spinner(false);
+    toast('読み込みに失敗: ' + err.message, 4000);
+  }
+}
+
+function renderMeals(items) {
+  const wrap = $('meals-list');
+  wrap.innerHTML = '';
+  if (!items.length) {
+    wrap.appendChild(el('p', { class: 'view-note' }, 'この日はアプリからの食事記録がありません。'));
+    $('meals-total').textContent = '--';
+    return;
+  }
+  let totalKcal = 0, totalProtein = 0;
+  items.forEach(it => {
+    totalKcal += it.kcal;
+    totalProtein += it.protein;
+    wrap.appendChild(buildMealEditCard(it));
+  });
+  $('meals-total').textContent = `${fmt(totalKcal)}kcal / たんぱく質${fmt(totalProtein, 1)}g`;
+}
+
+function buildMealEditCard(item) {
+  const card = el('div', { class: 'card record-card' });
+
+  card.appendChild(el('label', { class: 'field-label' }, '食事の区分'));
+  const slotSel = el('select');
+  ['朝食', '昼食', '夕食', '間食'].forEach(s => {
+    const o = el('option', { value: s }, s);
+    if (s === item.slot) o.selected = true;
+    slotSel.appendChild(o);
+  });
+  card.appendChild(slotSel);
+
+  card.appendChild(el('label', { class: 'field-label' }, '品名'));
+  const nameIn = el('input', { type: 'text' });
+  nameIn.value = item.name;
+  card.appendChild(nameIn);
+
+  card.appendChild(el('label', { class: 'field-label' }, 'カロリー(kcal)'));
+  const kcalIn = el('input', { type: 'number', inputmode: 'decimal' });
+  kcalIn.value = item.kcal;
+  card.appendChild(kcalIn);
+
+  card.appendChild(el('label', { class: 'field-label' }, 'たんぱく質(g)'));
+  const pIn = el('input', { type: 'number', inputmode: 'decimal' });
+  pIn.value = item.protein;
+  card.appendChild(pIn);
+
+  const row = el('div', { class: 'row-buttons' });
+  const delBtn = el('button', { class: 'btn danger' }, '削除');
+  delBtn.addEventListener('click', async () => {
+    if (!confirm(`「${item.name}」を削除しますか?\nシートの食事欄と合計も自動で直ります。`)) return;
+    try {
+      spinner(true, '削除しています…');
+      const res = await api('meal_delete', { row: item.row });
+      spinner(false);
+      toast('削除しました');
+      renderMeals(res.items);
+    } catch (err) {
+      spinner(false);
+      toast('削除に失敗: ' + err.message, 4000);
+    }
+  });
+  const saveBtn = el('button', { class: 'btn primary' }, '修正を保存');
+  saveBtn.addEventListener('click', async () => {
+    const name = nameIn.value.trim();
+    if (!name) { toast('品名を入力してください'); return; }
+    try {
+      spinner(true, '保存しています…');
+      const res = await api('meal_update', {
+        row: item.row,
+        slot: slotSel.value,
+        name: name,
+        kcal: Number(kcalIn.value) || 0,
+        protein: Number(pIn.value) || 0
+      });
+      spinner(false);
+      toast('修正しました');
+      renderMeals(res.items);
+    } catch (err) {
+      spinner(false);
+      toast('保存に失敗: ' + err.message, 4000);
+    }
+  });
+  row.appendChild(delBtn);
+  row.appendChild(saveBtn);
+  card.appendChild(row);
+  return card;
+}
 
 // ---------- 定番メニュー ----------
 $('btn-favorites').addEventListener('click', async () => {

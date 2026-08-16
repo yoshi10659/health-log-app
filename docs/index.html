@@ -56,6 +56,8 @@
       <span class="chip" data-slot="間食">間食</span>
     </div>
 
+    <button class="btn secondary full" id="btn-meals" style="margin-bottom:12px;">🍴 食事の一覧・修正</button>
+
     <div class="undo-banner hidden" id="undo-banner">
       <span class="undo-text" id="undo-text"></span>
       <button class="undo-btn" id="btn-undo">取り消す</button>
@@ -102,10 +104,23 @@
     <button class="btn secondary full" id="btn-confirm-back">ホームに戻る</button>
   </main>
 
+  <!-- 食事の一覧・修正 -->
+  <main id="view-meals" class="view hidden">
+    <h2 class="view-title">食事の一覧・修正</h2>
+    <p class="view-note">日付を選ぶと、その日にアプリで記録した食事を修正・削除できます。</p>
+    <input type="date" id="meals-date">
+    <div id="meals-list"></div>
+    <div class="card" id="meals-total-card">
+      <div class="card-label">この日の合計</div>
+      <div id="meals-total">--</div>
+    </div>
+    <button class="btn secondary full" id="btn-meals-back">ホームに戻る</button>
+  </main>
+
   <!-- 定番メニュー管理 -->
   <main id="view-favorites" class="view hidden">
     <h2 class="view-title">定番メニュー</h2>
-    <p class="view-note">ここに登録した食事は、名前が一致すると確認なしで即記録されます。</p>
+    <p class="view-note">ここに登録した食事は、名前が一致すると確認なしで即記録されます。ゆで卵やアーモンドのように数を数えて食べるものは「1個(1粒)あたり」の値で登録すると、「ゆで卵二個」「アーモンド20粒」と言うだけで自動でかけ算されます。</p>
     <div id="favorites-list"></div>
     <section class="card">
       <div class="card-label">新しく登録</div>

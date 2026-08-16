@@ -52,29 +52,46 @@ function analyze_(req) {
 
   const records = Array.isArray(parsed.records) ? parsed.records : [];
   records.forEach(function (rec) {
-    if (rec.type === 'meal') matchFavorite_(rec, favorites);
+    if (rec.type === 'meal') {
+      matchFavorite_(rec, favorites);
+      applyQuantityLabel_(rec);
+    }
   });
 
   return { records: records, notes: parsed.notes || '' };
 }
 
-/** 定番マスタとの照合。一致したら固定値で上書きし、即書きフラグを立てる */
+/**
+ * 定番マスタとの照合。一致したら「1単位あたりの固定値 × 数量」で上書きし、即書きフラグを立てる。
+ * 例: 定番「ゆで卵」65kcal/5.8g + 「ゆで卵二個」→ 130kcal/11.6g
+ */
 function matchFavorite_(rec, favorites) {
   const norm = function (s) {
     return String(s || '').toLowerCase().replace(/[\s　]/g, '');
   };
   const name = norm(rec.name);
   if (!name) return;
+  const qty = Number(rec.quantity) > 0 ? Number(rec.quantity) : 1;
   for (let i = 0; i < favorites.length; i++) {
     const fav = favorites[i];
     const favName = norm(fav.name);
     if (name === favName || name.indexOf(favName) !== -1 || favName.indexOf(name) !== -1) {
-      rec.kcal = fav.kcal;
-      rec.protein = fav.protein;
+      rec.kcal = Math.round(fav.kcal * qty * 10) / 10;
+      rec.protein = Math.round(fav.protein * qty * 10) / 10;
       rec.favoriteMatch = fav.name;
       rec.confidence = 1;
       return;
     }
+  }
+}
+
+/** 品名に数量を含める(ゆで卵 + 2個 → ゆで卵2個)。シートに残る表記を分かりやすくする */
+function applyQuantityLabel_(rec) {
+  const qty = Number(rec.quantity) > 0 ? Number(rec.quantity) : 1;
+  if (rec.unit) {
+    rec.name = String(rec.name) + qty + rec.unit;
+  } else if (qty !== 1) {
+    rec.name = String(rec.name) + '×' + qty;
   }
 }
 
@@ -93,7 +110,7 @@ function buildPrompt_(favorites) {
     '# 返すJSONの形式',
     '{',
     '  "records": [',
-    '    {"type":"meal","date":"YYYY-MM-DD または null","slot":"朝食/昼食/夕食/間食 または null","name":"品名(量も含める 例: プロテイン30g)","kcal":数値またはnull,"protein":数値またはnull,"confidence":0から1},',
+    '    {"type":"meal","date":"YYYY-MM-DD または null","slot":"朝食/昼食/夕食/間食 または null","name":"品名","quantity":数量(デフォルト1),"unit":"個/粒/枚/杯 など または null","kcal":数値またはnull,"protein":数値またはnull,"confidence":0から1},',
     '    {"type":"weight","date":"YYYY-MM-DD または null","weightKg":数値またはnull,"bodyFatPct":数値またはnull},',
     '    {"type":"steps","date":"YYYY-MM-DD または null","steps":数値},',
     '    {"type":"training","date":"YYYY-MM-DD または null","text":"【部位】種目 重量x回数 ..."}',
@@ -106,6 +123,8 @@ function buildPrompt_(favorites) {
     '- 日付の指定(「8月15日」「昨日」など)があればdateに入れる。指定がなければnull(今日扱い)。',
     '- 音声の文字起こしは日本語として解釈する。',
     '- 食事のslotは発言に「朝食」「昼食」「夕食」「間食」があればそれを使い、なければnull。',
+    '- 「ゆで卵二個」「アーモンド20粒」のように同じものを複数食べた場合: nameは「ゆで卵」「アーモンド」のように数量を除いた名前、quantityに数(2, 20)、unitに単位(個, 粒)を入れる。kcalとproteinは合計量(全部でいくつか)を入れる。不明ならnull。',
+    '- 「プロテイン30g」「白ごはん150g」のような内容量・グラム数は数量ではないのでnameに含め、quantityは1、unitはnullにする。',
     '- 栄養成分表示の写真: 商品名とカロリー・たんぱく質を読み取り、1包装分に換算する(100gあたり表示なら内容量を考慮)。confidenceは0.9以上。',
     '- 料理の写真(ラベルなし): 内容を推定し、kcalとproteinも推定するが、confidenceは0.6以下にする。',
     '- 体重計や体組成計の画面写真: weightKg(kg)とbodyFatPct(%)を読み取る。',

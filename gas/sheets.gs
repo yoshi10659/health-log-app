@@ -222,26 +222,24 @@ function writeRecord_(rec, force) {
 
   if (rec.type === 'meal') {
     const slot = SLOT_COL[rec.slot] ? rec.slot : '間食';
-    const dSheet = dailySheet_(date);
-    const ySheet = yearSheet_(date);
-    const dRow = ensureRow_(dSheet, date, 'daily');
-    const yRow = ensureRow_(ySheet, date, 'year');
-    const col = SLOT_COL[slot];
-
-    pushChange_(changes, dSheet, dRow, col);
-    const cur = String(dSheet.getRange(dRow, col).getValue() || '').trim();
-    dSheet.getRange(dRow, col).setValue(cur ? cur + ' ' + rec.name : rec.name);
-
     const kcal = Number(rec.kcal) || 0;
     const protein = Number(rec.protein) || 0;
-    if (kcal) {
-      addToNumberCell_(changes, dSheet, dRow, DAILY_COL.kcal, kcal, 'kcal0');
-      addToNumberCell_(changes, ySheet, yRow, YEAR_COL.kcal, kcal, 'kcal1');
-    }
-    if (protein) {
-      addToNumberCell_(changes, dSheet, dRow, DAILY_COL.protein, protein, 'g');
-    }
+    const dateStr = Utilities.formatDate(date, 'Asia/Tokyo', 'yyyy-MM-dd');
+
+    const detail = detailSheet_();
+    detail.appendRow([dateStr, slot, rec.name, kcal, protein, new Date()]);
+    const detailRow = detail.getLastRow();
+    rebuildDay_(date);
+
     summary = dateLabel + ' ' + slot + 'に「' + rec.name + '」(' + kcal + 'kcal / ' + protein + 'g)を追記';
+    PROPS.setProperty('LAST_LOG', JSON.stringify({
+      ts: new Date().toISOString(),
+      kind: 'meal',
+      summary: summary,
+      detailRow: detailRow,
+      dateStr: dateStr
+    }));
+    return { written: true, summary: summary };
 
   } else if (rec.type === 'weight') {
     const dSheet = dailySheet_(date);
@@ -303,10 +301,116 @@ function writeRecord_(rec, force) {
 
   PROPS.setProperty('LAST_LOG', JSON.stringify({
     ts: new Date().toISOString(),
+    kind: 'cells',
     summary: summary,
     changes: changes
   }));
   return { written: true, summary: summary };
+}
+
+// ---------- 食事明細(1件=1行。食事セルと合計はここから再構築する) ----------
+
+const DETAIL_SHEET_NAME = '食事明細';
+
+function detailSheet_() {
+  const ss = ss_();
+  let sheet = ss.getSheetByName(DETAIL_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(DETAIL_SHEET_NAME);
+    sheet.getRange(1, 1, 1, 6).setValues([['日付', '区分', '品名', 'カロリー', 'たんぱく質', '登録時刻']]);
+  }
+  return sheet;
+}
+
+function detailDateStr_(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Tokyo', 'yyyy-MM-dd');
+  return String(v).trim();
+}
+
+function detailItems_(dateStr) {
+  const sheet = detailSheet_();
+  const last = sheet.getLastRow();
+  const out = [];
+  if (last < 2) return out;
+  const values = sheet.getRange(2, 1, last - 1, 5).getValues();
+  values.forEach(function (r, i) {
+    if (detailDateStr_(r[0]) !== dateStr) return;
+    out.push({
+      row: i + 2,
+      slot: String(r[1]).trim() || '間食',
+      name: String(r[2]),
+      kcal: Number(r[3]) || 0,
+      protein: Number(r[4]) || 0
+    });
+  });
+  return out;
+}
+
+/** その日の食事セル(朝〜間食)と合計カロリー・たんぱく質を、食事明細から作り直す */
+function rebuildDay_(date) {
+  const dateStr = Utilities.formatDate(date, 'Asia/Tokyo', 'yyyy-MM-dd');
+  const items = detailItems_(dateStr);
+  const dSheet = dailySheet_(date);
+  const ySheet = yearSheet_(date);
+  const dRow = ensureRow_(dSheet, date, 'daily');
+  const yRow = ensureRow_(ySheet, date, 'year');
+
+  const texts = { '朝食': [], '昼食': [], '夕食': [], '間食': [] };
+  let kcal = 0, protein = 0;
+  items.forEach(function (it) {
+    (texts[it.slot] || texts['間食']).push(it.name);
+    kcal += it.kcal;
+    protein += it.protein;
+  });
+
+  Object.keys(SLOT_COL).forEach(function (slot) {
+    const cell = dSheet.getRange(dRow, SLOT_COL[slot]);
+    const t = texts[slot].join(' ');
+    if (t) cell.setValue(t); else cell.clearContent();
+  });
+
+  if (kcal > 0) {
+    setNumberCell_(dSheet, dRow, DAILY_COL.kcal, kcal, 'kcal0');
+    setNumberCell_(ySheet, yRow, YEAR_COL.kcal, kcal, 'kcal1');
+  } else {
+    dSheet.getRange(dRow, DAILY_COL.kcal).clearContent();
+    ySheet.getRange(yRow, YEAR_COL.kcal).clearContent();
+  }
+  if (protein > 0) {
+    setNumberCell_(dSheet, dRow, DAILY_COL.protein, protein, 'g');
+  } else {
+    dSheet.getRange(dRow, DAILY_COL.protein).clearContent();
+  }
+}
+
+function mealsList_(req) {
+  const dateStr = req.date || Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy-MM-dd');
+  return { date: dateStr, items: detailItems_(dateStr) };
+}
+
+function mealUpdate_(req) {
+  const sheet = detailSheet_();
+  const row = Number(req.row);
+  const dateStr = detailDateStr_(sheet.getRange(row, 1).getValue());
+  sheet.getRange(row, 2, 1, 4).setValues([[
+    SLOT_COL[req.slot] ? req.slot : '間食',
+    String(req.name || '').trim(),
+    Number(req.kcal) || 0,
+    Number(req.protein) || 0
+  ]]);
+  rebuildDay_(parseISO_(dateStr));
+  PROPS.deleteProperty('LAST_LOG');
+  return { date: dateStr, items: detailItems_(dateStr) };
+}
+
+function mealDelete_(req) {
+  const sheet = detailSheet_();
+  const row = Number(req.row);
+  const dateStr = detailDateStr_(sheet.getRange(row, 1).getValue());
+  sheet.deleteRow(row);
+  rebuildDay_(parseISO_(dateStr));
+  PROPS.deleteProperty('LAST_LOG');
+  return { date: dateStr, items: detailItems_(dateStr) };
 }
 
 // ---------- 取り消し(直近1件) ----------
@@ -315,6 +419,14 @@ function undoLast_() {
   const raw = PROPS.getProperty('LAST_LOG');
   if (!raw) return { error: '取り消せる記録がありません' };
   const log = JSON.parse(raw);
+
+  if (log.kind === 'meal') {
+    detailSheet_().deleteRow(log.detailRow);
+    rebuildDay_(parseISO_(log.dateStr));
+    PROPS.deleteProperty('LAST_LOG');
+    return { undone: true, summary: log.summary };
+  }
+
   const ss = ss_();
   log.changes.reverse().forEach(function (ch) {
     const sh = ss.getSheetByName(ch.sheet);
